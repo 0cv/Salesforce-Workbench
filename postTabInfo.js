@@ -11,7 +11,7 @@ function getSessionId() {
     if (allCookies.indexOf('sid=') == -1) {
       return null;
     }
-    return allCookies.match(/sid\=(.*?);/)[1];
+    return allCookies.match(/sid\=(.*?)(;|$)/)[1];
   }
 }
 
