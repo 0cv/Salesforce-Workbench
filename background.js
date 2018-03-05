@@ -104,7 +104,7 @@ var workbenchtoolsforchrome = {
         chrome.tabs.onUpdated.addListener(workbenchtoolsforchrome.listenTabLoading);
         
         //we execute the lightning switcher to Salesforce Classic
-        chrome.tabs.create({'url': 'https://' + hostname + '/lightning/switcher?destination=classic'}, (tab) => {
+        chrome.tabs.create({'url': 'https://' + hostname + '/ltng/switcher?destination=classic'}, (tab) => {
           tabId = tab.id
         });
       }      
@@ -122,7 +122,7 @@ var workbenchtoolsforchrome = {
             chrome.tabs.onUpdated.addListener(workbenchtoolsforchrome.listenTabLoading2);
       
             // We have to revert back to Lightning, to not change the context of the User
-            chrome.tabs.update(tabId, {url: 'https://' + hostname + '/lightning/switcher?destination=lex'});
+            chrome.tabs.update(tabId, {url: 'https://' + hostname + '/ltng/switcher?destination=lex'});
           } else {
             // We can remove safely the temporary .salesforce.com page
             chrome.tabs.remove(tabId);
