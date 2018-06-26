@@ -7,12 +7,19 @@ var workbenchtoolsforchrome = {
     badPageErrorMsg : 'Ooops! This command must only be excuted when logged into Salesforce. Select a tab with an active Salesforce session and try again.',
         
     onRequest : function(request, sender, sendResponse) {
+	
       // Show the page action for the tab that the sender (content script) was on.
-      if (sender.tab.url.indexOf('blacktaboid') > -1 && sender.tab.url.indexOf('servlet/servlet.su') == -1) {
-        chrome.pageAction.setIcon({'tabId':sender.tab.id, 'path':'workbench-3-black-cube-48x48.png'});
-      }
-      
-      chrome.pageAction.show(sender.tab.id);
+		if (sender.tab.url.indexOf('blacktaboid') > -1 && sender.tab.url.indexOf('servlet/servlet.su') == -1) {
+			chrome.pageAction.setIcon({'tabId':sender.tab.id, 'path':'workbench-3-black-cube-48x48.png'});
+		}
+	// Check if there is a SID related to the page the content script ran on
+		chrome.cookies.getAll({"url":sender.tab.url,"name":"sid"},function (cookie){
+			console.log (cookie.length);
+			console.log(JSON.stringify(cookie[0]));
+			if (cookie.length > 0) {
+				chrome.pageAction.show(sender.tab.id);
+	  		}
+		});
   
       // Return nothing to let the connection be cleaned up.
       sendResponse({});
@@ -31,15 +38,22 @@ var workbenchtoolsforchrome = {
       // This will get called by the content script we execute in
       // the tab as a result of the user pressing the browser action.
       port.onMessage.addListener((tabInfo) => {      
-        if (!tabInfo.url || !tabInfo.sessionId) {
+        if (!tabInfo.url ) {
           alert(this.badPageErrorMsg);
           return;        
         }
         hostname = tabInfo.hostname;
-        workbenchtoolsforchrome.loginFromSession(tabInfo.url, tabInfo.sessionId);
-      });
+	// Get the SID realted to the page the content script ran on
+		chrome.cookies.getAll({"url":tabInfo.url,"name":"sid"},function (cookie){
+            console.log(JSON.stringify(cookie[0]));
+            var sessionId = cookie[0].value; 
+            workbenchtoolsforchrome.loginFromSession(tabInfo.url, sessionId);
+		});
+	  });
     },
     
+	
+	
     gotoWorkbench : function(urlTail) {
       if (window.localStorage == null) {
         alert("Local storage must be enabled for Workbench Tools");
@@ -107,7 +121,8 @@ var workbenchtoolsforchrome = {
         chrome.tabs.create({'url': 'https://' + hostname + '/ltng/switcher?destination=classic'}, (tab) => {
           tabId = tab.id
         });
-      }      
+      }
+        
     },
 
     listenTabLoading(_tabId, changeInfo) {

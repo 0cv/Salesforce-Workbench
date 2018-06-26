@@ -14,19 +14,23 @@
     },
   "options_page": "options.html",
   "permissions": [
-    "tabs", 
-    "https://*.salesforce.com/*", 
-    "https://*.force.com/*",
-    "http://*.salesforce.com/*", 
-    "http://*.force.com/*"
+	"activeTab",
+	"cookies",
+		"https://*.salesforce.com/*", 
+		"https://*.force.com/*",
+		"http://*.salesforce.com/*", 
+		"http://*.force.com/*",
+    "tabs",
+		"https://*.salesforce.com/*", 
+		"https://*.force.com/*",
+		"http://*.salesforce.com/*", 
+		"http://*.force.com/*"
   ],
   "content_scripts" : [
     {
       "matches" : [
         "https://*.salesforce.com/*",
-        "https://*.force.com/*",
-        "http://*.salesforce.com/*",
-        "http://*.force.com/*"
+        "https://*.force.com/*"
       ],
       "js" : ["showPageAction.js"],
       "run_at" : "document_end",
