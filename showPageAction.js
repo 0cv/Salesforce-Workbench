@@ -1,1 +1,1 @@
-chrome.runtime.sendMessage({}, function(response) {console.log("response", response);});
+chrome.runtime.sendMessage({}, function() {});
