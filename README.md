@@ -5,3 +5,10 @@ https://chrome.google.com/webstore/detail/workbench-tools-for-googl/nanhambbggdg
 
 Feel free to contribute or to log issues in this repository.
 
+
+
+# Prerequisite
+
+Workbench is a PHP app which must be installed locally https://github.com/forceworkbench/forceworkbench
+
+

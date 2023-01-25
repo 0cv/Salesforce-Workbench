@@ -1,47 +1,37 @@
-var tabId,
-    hostname,
-    isInLightning = false;
-
 var workbenchtoolsforchrome = {
     badPageErrorMsg : 'Ooops! This command must only be excuted when logged into Salesforce. Select a tab with an active Salesforce session and try again.',
-    onRequest: function(request, sender, sendResponse) {
-        // Show the page action for the tab that the sender (content script) was on.
-        if (sender.tab.url.indexOf('blacktaboid') > -1 && sender.tab.url.indexOf('servlet/servlet.su') == -1) {
-            chrome.pageAction.setIcon({'tabId':sender.tab.id, 'path':'workbench-3-black-cube-48x48.png'});
-        }
 
-        // Check if there is a SID related to the page the content script ran on
-        chrome.cookies.getAll({'url':sender.tab.url,'name':'sid'},function (cookie){
-            console.log (cookie.length);
-            console.log(JSON.stringify(cookie[0]));
-            if (cookie.length > 0) {
-                chrome.pageAction.show(sender.tab.id);
-            }
-        });
-
-        // Return nothing to let the connection be cleaned up.
-        sendResponse({});
-    },
     onClicked: function(tab) {
         if (tab.url.indexOf('http:') != 0 && tab.url.indexOf('https:') != 0) {
-            alert(this.badPageErrorMsg);
-            return;
+            return chrome.notifications.create({
+                type: 'basic',
+                title: 'Error',
+                iconUrl: 'workbench-3-cube-48x48.png',
+                message: workbenchtoolsforchrome.badPageErrorMsg,
+                priority: 1
+            });
         }
 
-        chrome.tabs.executeScript(null, {file: 'postTabInfo.js'});
+        chrome.scripting.executeScript({
+            target : {tabId : tab.id},
+            files: ['postTabInfo.js']
+        });
     },
     onConnect: function(port) {
         // This will get called by the content script we execute in
         // the tab as a result of the user pressing the browser action.
         port.onMessage.addListener((tabInfo) => {
-            if (!tabInfo.url ) {
-                alert(this.badPageErrorMsg);
-                return;
-            }
-            hostname = tabInfo.hostname;
             // Get the SID related to the page the content script ran on
-            chrome.cookies.getAll({'url':tabInfo.url,'name':'sid'},function (cookie){
-                console.log(JSON.stringify(cookie[0]));
+            chrome.cookies.getAll({'url':tabInfo.url,'name':'sid'}, (cookie) => {
+                if (!tabInfo.url || !cookie || !cookie.length) {
+                    return chrome.notifications.create({
+                        type: 'basic',
+                        title: 'Error',
+                        iconUrl: 'workbench-3-cube-48x48.png',
+                        message: workbenchtoolsforchrome.badPageErrorMsg,
+                        priority: 1
+                    });
+                }
                 var sessionId = cookie[0].value;
                 var domain = cookie[0].domain
                 // If the domain is .salesforce.com, pass to workbench
@@ -63,43 +53,32 @@ var workbenchtoolsforchrome = {
             });
         });
     },
-    gotoWorkbench: function(urlTail) {
-        if (window.localStorage == null) {
-            alert('Local storage must be enabled for Workbench Tools');
-            return;
+    gotoWorkbench: async function(urlTail) {
+        const ls = chrome.storage.local;
+
+        if (!ls) {
+            return chrome.notifications.create({
+                type: 'basic',
+                title: 'Error',
+                iconUrl: 'workbench-3-cube-48x48.png',
+                message: 'Permission missing for local storage',
+                priority: 1
+            });
         }
 
-        if (window.localStorage.customWorkbenchBaseUrl == null || window.localStorage.customWorkbenchBaseUrl == '') {
-            try {
-                const DEFAULT_WORKBENCH_BASE_URL = 'http://workbench';
-                var xhr = new XMLHttpRequest();
-                xhr.open('HEAD', DEFAULT_WORKBENCH_BASE_URL, false);
-                xhr.send(null);
+        const key = 'customWorkbenchBaseUrl';
+        const baseUrl = (await ls.get(key))[key];
 
-                if (xhr.status == 302 || xhr.status == 200) {
-                    window.localStorage.customWorkbenchBaseUrl = DEFAULT_WORKBENCH_BASE_URL;
-                }
-            } catch (e) {
-                chrome.tabs.create({'url': chrome.extension.getURL('options.html')});
-                return;
-            }
+        if (!baseUrl) {
+            console.log('get url options.html', chrome.runtime.getURL('options.html'));
+            return chrome.tabs.create({'url': chrome.runtime.getURL('options.html')});
         }
 
         urlTail = urlTail || '';
-        var urlToOpen = window.localStorage.customWorkbenchBaseUrl + urlTail;
+        var urlToOpen = baseUrl + urlTail;
         chrome.tabs.create({'url': urlToOpen});
     },
     loginFromSession: function(currentUrl, sessionId) {
-        //capture serverUrl prefix
-        if (currentUrl.indexOf('localhost') > -1) {
-            alert('Cannot login to Workbench with \'localhost\'. To use with a local build, set \'app_server\' in your user.properties to your hostname.');
-            return;
-        }
-
-        if (currentUrl.indexOf('blacktaboid') > -1 && currentUrl.indexOf('servlet/servlet.su') == -1) {
-            alert('Cannot login to Workbench from Blacktab unless you are viewing the Session ID of a user who granted login access.');
-            return;
-        }
         //pass params to Workbench
         this.gotoWorkbench('/login.php?serverUrlPrefix=' + escape(currentUrl) + '&sid=' + escape(sessionId));
     },
@@ -107,5 +86,40 @@ var workbenchtoolsforchrome = {
 
 // REGISTER LISTENERS
 chrome.runtime.onMessage.addListener(workbenchtoolsforchrome.onRequest);
-chrome.pageAction.onClicked.addListener(workbenchtoolsforchrome.onClicked);
+chrome.action.onClicked.addListener(workbenchtoolsforchrome.onClicked);
 chrome.runtime.onConnect.addListener(workbenchtoolsforchrome.onConnect);
+
+// Trick to successfully grey / ungrey the icon on other websites due to a bug in the manifest 3
+// Credits to https://stackoverflow.com/questions/64473519/how-to-disable-gray-out-page-action-for-chrome-extension/64475504#64475504
+chrome.declarativeContent.onPageChanged.removeRules(async () => {
+    const loadImageData = async (url) => {
+        const img = await createImageBitmap(await (await fetch(url)).blob());
+        const {width: w, height: h} = img;
+        const canvas = new OffscreenCanvas(w, h);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        return ctx.getImageData(0, 0, w, h);
+    }
+
+    chrome.declarativeContent.onPageChanged.addRules([{
+        conditions: [
+            new chrome.declarativeContent.PageStateMatcher({
+                pageUrl: { hostSuffix: '.salesforce.com' },
+            }),
+            new chrome.declarativeContent.PageStateMatcher({
+                pageUrl: { hostSuffix: '.force.com' },
+            }),
+        ],
+        actions: [
+            new chrome.declarativeContent.SetIcon({
+                imageData: {
+                    48: await loadImageData('workbench-3-cube-48x48.png'),
+                },
+            }),
+            chrome.declarativeContent.ShowAction
+                ? new chrome.declarativeContent.ShowAction()
+                : new chrome.declarativeContent.ShowPageAction(),
+        ],
+    }]);
+});
+
